@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700&display=swap" rel="stylesheet">
+    <title>THR Maximization</title>
+    <style>
+        body {
+            height: 100%; /* Ensure the body fills the entire viewport */
+            font-family: 'Cinzel Decorative', serif;
+            margin: 0; /* Remove default margin */
+            padding: 20px;
+            color: #FFC727;
+            background: url('THR.png') center/cover no-repeat fixed; /* Set background image to cover entire body and remain fixed */
+        }
+
+        .container {
+            max-width: 600px;
+            margin: auto;
+            padding: 20px;
+            background-color: transparent;
+        }
+
+        h1,
+        h2 {
+            text-align: center;
+        }
+
+        form {
+            margin-bottom: 20px;
+        }
+
+        fieldset {
+            margin-bottom: 10px;
+            padding: 10px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        input,
+        select,
+        button {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            box-sizing: border-box;
+        }
+
+        img {
+            float: right;
+            width: 200px;
+            height: auto;
+            margin-left: 20px;
+        }
+
+        .result-section {
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .result-section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+
+        .result-section p {
+            margin-bottom: 10px;
+            color: #666;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1> TUGAS BESAR STRATEGI ALGORITMA </h1> 
+    </div>
+
+    <div class="container">
+        <h1>THR Maximization</h1>
+        <form id="initialForm">
+            <label for="numHouses">How many house would you like to visit?</label>
+            <input type="number" id="numHouses" name="numHouses" required>
+
+            <label for="maxTime">Maximum Time (In minutes)</label>
+            <input type="number" id="maxTime" name="maxTime" required>
+
+            <button type="submit">Generate Form</button>
+        </form>
+
+        <div id="houseFormContainer"></div>
+        <div id="resultContainer"></div>
+    </div>
+
+    <script>
+        document.getElementById('initialForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const numHouses = document.getElementById('numHouses').value;
+            const maxTime = document.getElementById('maxTime').value;
+
+            let houseFormHtml = '<h2>Enter House Details</h2><form id="houseForm">';
+            for (let i = 1; i <= numHouses; i++) {
+                houseFormHtml += `
+                    <fieldset>
+                        <legend>House ${i}</legend>
+                        <label for="houseName${i}">House Name:</label>
+                        <input type="text" id="houseName${i}" name="houseName${i}" required>
+                        <label for="timeSpent${i}">Time Spent (minutes):</label>
+                        <input type="number" id="timeSpent${i}" name="timeSpent${i}" required>
+                        <label for="thrIncome${i}">THR Income:</label>
+                        <input type="number" id="thrIncome${i}" name="thrIncome${i}" required>
+                    </fieldset>`;
+            }
+            houseFormHtml += `
+                <input type="hidden" id="maxTimeHidden" name="maxTime" value="${maxTime}">
+                <label for="method">Choose Method:</label>
+                <select id="method" name="method" required>
+                    <option value="bruteForce">Brute Force</option>
+                    <option value="greedy">Greedy</option>
+                </select>
+                <button type="submit">Calculate</button>
+            </form>`;
+            document.getElementById('houseFormContainer').innerHTML = houseFormHtml;
+
+            document.getElementById('houseForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                const houseFormData = new FormData(e.target);
+                const formDataObj = Object.fromEntries(houseFormData);
+                const numHouses = parseInt(document.getElementById('numHouses').value);
+                const houses = [];
+
+                for (let i = 1; i <= numHouses; i++) {
+                    houses.push({
+                        houseName: formDataObj[`houseName${i}`],
+                        timeSpent: parseInt(formDataObj[`timeSpent${i}`]),
+                        thrIncome: parseInt(formDataObj[`thrIncome${i}`])
+                    });
+                }
+
+                const maxTime = parseInt(formDataObj['maxTime']);
+                const method = formDataObj['method'];
+
+                let result;
+                let startTime, endTime;
+                if (method === 'greedy') {
+                    startTime = performance.now();
+                    const results = {
+                        byProfit: greedyKnapsack(maxTime, [...houses], (a, b) => b.thrIncome - a.thrIncome),
+                        byWeight: greedyKnapsack(maxTime, [...houses], (a, b) => a.timeSpent - b.timeSpent),
+                        byDensity: greedyKnapsack(maxTime, [...houses], (a, b) => (b.thrIncome / b.timeSpent) - (a.thrIncome / a.timeSpent))
+                    };
+                    endTime = performance.now();
+                    result = getBestGreedyResult(results);
+                    result.executionTime = endTime - startTime; 
+                } else {
+                    startTime = performance.now();
+                    result = bruteForceKnapsack(maxTime, houses);
+                    endTime = performance.now();
+                    result.executionTime = endTime - startTime; 
+                }
+                displayResult(result, method);
+            });
+        });
+
+        function bruteForceKnapsack(W, items) {
+            const n = items.length;
+            const wt = items.map(item => item.timeSpent);
+            const val = items.map(item => item.thrIncome);
+
+            function knapSack(W, wt, val, n) {
+                if (n === 0 || W === 0) {
+                    return {
+                        maxProfit: 0,
+                        selectedItems: []
+                    };
+                }
+                if (wt[n - 1] > W) {
+                    return knapSack(W, wt, val, n - 1);
+                }
+
+                let includeItem = knapSack(W - wt[n - 1], wt, val, n - 1);
+                includeItem.maxProfit += val[n - 1];
+                includeItem.selectedItems = [...includeItem.selectedItems, items[n - 1]];
+
+                let excludeItem = knapSack(W, wt, val, n - 1);
+
+                return includeItem.maxProfit > excludeItem.maxProfit ? includeItem : excludeItem;
+            }
+
+            return knapSack(W, wt, val, n);
+        }
+
+        function greedyKnapsack(W, items, comparator) {
+            items.sort(comparator);
+            let totalProfit = 0;
+            let remainingTime = W;
+            let selectedItems = [];
+            for (const item of items) {
+                if (item.timeSpent <= remainingTime) {
+                    remainingTime -= item.timeSpent;
+                    totalProfit += item.thrIncome;
+                    selectedItems.push(item);
+                }
+            }
+            return {
+                totalProfit,
+                selectedItems
+            };
+        }
+
+        function getBestGreedyResult(results) {
+            let bestResult = results.byProfit;
+            if (results.byWeight.totalProfit > bestResult.totalProfit) {
+                bestResult = results.byWeight;
+            }
+            if (results.byDensity.totalProfit > bestResult.totalProfit) {
+                bestResult = results.byDensity;
+            }
+            return {
+                best: bestResult,
+                all: results
+            };
+        }
+
+        function displayResult(result, method) {
+            const resultContainer = document.getElementById('resultContainer');
+            let resultHtml = '<h2>Result</h2>';
+
+            if (method === 'greedy') {
+                resultHtml += `
+                    <div class="result-section">
+                        <h3>Best Result</h3>
+                        <p>Total Profit: ${result.best.totalProfit}</p>
+                        <p>Selected Houses: ${result.best.selectedItems.map(item => item.houseName).join(', ')}</p>
+                        <p>Execution Time: ${result.executionTime} milliseconds</p>
+                        
+                        <h3>Greedy by Profit</h3>
+                        <p>Total Profit: ${result.all.byProfit.totalProfit}</p>
+                        <p>Selected Houses: ${result.all.byProfit.selectedItems.map(item => item.houseName).join(', ')}</p>
+
+                        <h3>Greedy by Weight</h3>
+                        <p>Total Profit: ${result.all.byWeight.totalProfit}</p>
+                        <p>Selected Houses: ${result.all.byWeight.selectedItems.map(item => item.houseName).join(', ')}</p>
+
+                        <h3>Greedy by Density</h3>
+                        <p>Total Profit: ${result.all.byDensity.totalProfit}</p>
+                        <p>Selected Houses: ${result.all.byDensity.selectedItems.map(item => item.houseName).join(', ')}</p>
+                    </div>
+                `;
+            } else {
+                resultHtml += `
+                    <div class="result-section">
+                        <h3>Brute Force Result</h3>
+                        <p>Total Profit: ${result.maxProfit}</p>
+                        <p>Selected Houses: ${result.selectedItems.map(item => item.houseName).join(', ')}</p>
+                        <p>Execution Time: ${result.executionTime} milliseconds</p>
+                       
+                `;
+            }
+
+            resultContainer.innerHTML = resultHtml;
+        }
+    </script>
+</body>
+
+</html>
